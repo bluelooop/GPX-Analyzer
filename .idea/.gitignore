@@ -9,3 +9,6 @@
 /inspectionProfiles
 modules.xml
 vcs.xml
+aws.xml
+misc.xml
+GPXAnalizer.iml
