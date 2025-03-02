@@ -2,7 +2,6 @@ import warnings
 from functools import wraps
 
 import math
-from gpxpy.gpx import GPXTrackPoint
 
 
 def deprecated(reason="This method is deprecated and will be removed in future versions."):

@@ -11,7 +11,7 @@ class RoutePoint(GPXTrackPoint):
     distance, cumulative distance, and grade calculations.
     """
 
-    def __init__(self, gpx_point: GPXTrackPoint, *args, **kwargs):
+    def __init__(self, gpx_point: GPXTrackPoint):
         super().__init__(
             gpx_point.latitude, gpx_point.longitude, gpx_point.elevation,
             gpx_point.time, gpx_point.symbol, gpx_point.comment,
@@ -58,7 +58,7 @@ class RouteSegment:
     and elevation statistics calculations.
     """
 
-    def __init__(self, gpx_segment: GPXTrackSegment, *args, **kwargs):
+    def __init__(self, gpx_segment: GPXTrackSegment):
         self._gpx_segment = gpx_segment
 
         self.number: int | None = None
