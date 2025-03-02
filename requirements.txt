@@ -1,4 +1,2 @@
 gpxpy~=1.6.2
-anthropic~=0.48.0
 dotenv
-requests

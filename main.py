@@ -1,16 +1,15 @@
-from collections import namedtuple
-
+import argparse
 import csv
 import os
+from collections import namedtuple
 
-import argparse
 from dotenv import load_dotenv
 
 from gpx import get_routes
 
 
-def write_on_csv(gpx_file, output_file, segment_length, ai_prompt=None):
-    routes = get_routes(gpx_file, segment_length, ai_prompt)
+def write_on_csv(gpx_file, output_file, segment_length):
+    routes = get_routes(gpx_file, segment_length)
 
     # Prepare CSV output
     with open(output_file, 'w', newline='') as csvfile:
@@ -55,8 +54,6 @@ def main():
         description='Convert GPX file to CSV with 1km segment analysis and AI descriptions')
     parser.add_argument('gpx_file', help='Path to GPX file')
     parser.add_argument('-o', '--output', help='Output CSV file (default: input_file_name.csv)')
-    parser.add_argument('-aip', '--ai-prompt', type=str,
-                        help='Specify an AI prompt to use for descriptions')
     parser.add_argument('-l', '--segment-length', type=float, default=1.0,
                         help='Length of segments in kilometers (default: 1.0)')
 
@@ -67,7 +64,7 @@ def main():
         base_name = os.path.splitext(os.path.basename(args.gpx_file))[0]
         args.output = f"{base_name}.csv"
 
-    write_on_csv(args.gpx_file, args.output, args.segment_length, args.ai_prompt)
+    write_on_csv(args.gpx_file, args.output, args.segment_length)
 
 
 if __name__ == "__main__":

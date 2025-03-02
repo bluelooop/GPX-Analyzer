@@ -2,9 +2,7 @@ import gpxpy
 import gpxpy.gpx
 from gpxpy.gpx import GPXTrackSegment, GPXTrackPoint
 
-from ai import generate_segment_description
-# from type import GPXSegment
-from utils import deprecated, haversine, calculate_gradient
+from utils import haversine, calculate_gradient
 
 
 class RoutePoint(GPXTrackPoint):
@@ -207,7 +205,7 @@ class Route:
         self.elevation_loss += segment.elevation_loss
 
 
-def get_routes(gpx_file: str, segment_length: float = 1.0, ai_prompt=None) -> list[Route] | None:
+def get_routes(gpx_file: str, segment_length: float = 1.0) -> list[Route] | None:
     """
     Generate a list of routes from a GPX file, segmenting based on distance
     and calculating route statistics.
@@ -215,7 +213,6 @@ def get_routes(gpx_file: str, segment_length: float = 1.0, ai_prompt=None) -> li
     Parameters:
         gpx_file (str): Path to the GPX file to process.
         segment_length (float): Maximum allowed length for a segment (in kilometers).
-        ai_prompt (optional): Prompt for additional AI-generated descriptions.
 
     Returns:
         list[Route] | None: A list of Route objects derived from the GPX file or None if an error occurs.
@@ -234,6 +231,7 @@ def get_routes(gpx_file: str, segment_length: float = 1.0, ai_prompt=None) -> li
 
                 for segment_idx, segment in enumerate(track.segments):
                     route_segment = RouteSegment(segment)
+
                     # Variables for point-to-point calculations
                     previous_point: RoutePoint | None = None
 
