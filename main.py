@@ -6,11 +6,11 @@ import os
 import argparse
 from dotenv import load_dotenv
 
-from gpx import process_gpx
+from gpx import get_routes
 
 
 def write_on_csv(gpx_file, output_file, segment_length, ai_prompt=None):
-    segments = process_gpx(gpx_file, segment_length, ai_prompt)
+    routes = get_routes(gpx_file, segment_length, ai_prompt)
 
     # Prepare CSV output
     with open(output_file, 'w', newline='') as csvfile:
@@ -19,52 +19,29 @@ def write_on_csv(gpx_file, output_file, segment_length, ai_prompt=None):
         columns = [
             'Segment', 'Start Elevation', 'End Elevation', 'Min Elevation', 'Max Elevation',
             'Distance(Km)', 'Start Km', 'End Km', 'Elevation Gain', 'Elevation Loss',
-            'Avg Grade', 'Max grade', 'Min grade', 'Start time', 'End time', 'Duration'
+            'Avg Grade', 'Min grade', 'Max grade'
         ]
 
-        if ai_prompt:
-            columns.append('Description')
-
         rows = []
-        for segment in segments:
-            row = [
-                segment.number,
-                segment.start_elevation,
-                segment.end_elevation,
-                segment.min_elevation,
-                segment.max_elevation,
-                segment.distance,
-                segment.start_distance,
-                segment.end_distance,
-                segment.elevation_gain,
-                segment.elevation_loss,
-                segment.avg_grade,
-                segment.max_grade,
-                segment.min_grade,
-            ]
+        for route in routes:
+            for segment in route.segments:
+                row = [
+                    segment.number,
+                    round(segment.start_elevation, 2),
+                    round(segment.end_elevation, 2),
+                    round(segment.min_elevation, 2),
+                    round(segment.max_elevation, 2),
+                    round(segment.distance, 2),
+                    round(segment.start_distance, 2),
+                    round(segment.end_distance, 2),
+                    round(segment.elevation_gain, 2),
+                    round(segment.elevation_loss, 2),
+                    round(segment.avg_grade, 2),
+                    round(segment.min_grade, 2),
+                    round(segment.max_grade, 2),
+                ]
 
-            if segment.start_time:
-                row.append(segment.start_time)
-            else:
-                if "Start time" in columns:
-                    columns.remove("Start time")
-
-            if segment.end_time:
-                row.append(segment.end_time)
-            else:
-                if "End time" in columns:
-                    columns.remove("End time")
-
-            if segment.duration:
-                row.append(segment.duration)
-            else:
-                if "Duration" in columns:
-                    columns.remove("Duration")
-
-            if ai_prompt:
-                row.append(segment.description)
-
-            rows.append(row)
+                rows.append(row)
 
         segment_writer.writerow(columns)
         segment_writer.writerows(rows)
