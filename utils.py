@@ -1,4 +1,37 @@
+import warnings
+from functools import wraps
+
 import math
+from gpxpy.gpx import GPXTrackPoint
+
+
+def deprecated(reason="This method is deprecated and will be removed in future versions."):
+    """
+    A decorator to mark functions as deprecated with an optional reason.
+
+    When the decorated function is called, a `DeprecationWarning` is issued.
+
+    Parameters:
+        reason (str): A message explaining why the function is deprecated and 
+                      any alternative that should be used.
+
+    Returns:
+        function: The decorated function with a warning mechanism.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            warnings.warn(
+                f"{func.__name__} is deprecated: {reason}",
+                category=DeprecationWarning,
+                stacklevel=2
+            )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -42,27 +75,3 @@ def calculate_gradient(distance, elevation_diff):
 
     # Convert distance to meters for gradient calculation
     return (elevation_diff / (distance * 1000)) * 100
-
-
-def calculate_point_geo_data(point, previous_point):
-    """
-    Calculate geographical data for a point based on a previous point.
-
-    Parameters:
-        point: An object representing the current point with latitude, longitude, and elevation attributes.
-        previous_point: An object representing the previous point with latitude, longitude, and elevation attributes.
-
-    Returns:
-        list: A list containing:
-            - point_distance (float): Distance between the points in kilometers.
-            - elevation_diff (float): Elevation difference between the points in meters.
-            - gradient (float): Gradient between the points as a percentage.
-    """
-    point_distance = haversine(
-        previous_point.latitude, previous_point.longitude, point.latitude, point.longitude
-    )
-
-    elevation_diff = point.elevation - previous_point.elevation
-    gradient = calculate_gradient(point_distance, elevation_diff)
-
-    return [point_distance, elevation_diff, gradient]
