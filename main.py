@@ -6,10 +6,17 @@ from collections import namedtuple
 from dotenv import load_dotenv
 
 from gpx import get_routes
+from provider import is_valid_url, get_gpx_data
 
 
-def write_on_csv(gpx_file, output_file, segment_length):
-    routes = get_routes(gpx_file, segment_length)
+def write_on_csv(gpx_data_path, output_file, segment_length):
+    gpx_data = get_gpx_data(gpx_data_path)
+
+    routes = get_routes(gpx_data or gpx_data_path, segment_length)
+
+    if not routes:
+        print(f"No routes found for {gpx_data_path}")
+        return False
 
     # Prepare CSV output
     with open(output_file, 'w', newline='') as csvfile:
@@ -45,14 +52,14 @@ def write_on_csv(gpx_file, output_file, segment_length):
         segment_writer.writerow(columns)
         segment_writer.writerows(rows)
 
-    print(f"Successfully processed {gpx_file} to {output_file}")
+    print(f"Successfully processed {gpx_data_path} to {output_file}")
     return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Convert GPX file to CSV with 1km segment analysis and AI descriptions')
-    parser.add_argument('gpx_file', help='Path to GPX file')
+        description='Convert GPX data to CSV with 1km segment analysis and AI descriptions')
+    parser.add_argument('gpx_file_or_url', help='Path to GPX data')
     parser.add_argument('-o', '--output', help='Output CSV file (default: input_file_name.csv)')
     parser.add_argument('-l', '--segment-length', type=float, default=1.0,
                         help='Length of segments in kilometers (default: 1.0)')
@@ -61,10 +68,14 @@ def main():
 
     # Set default output file if not specified
     if not args.output:
-        base_name = os.path.splitext(os.path.basename(args.gpx_file))[0]
+        if is_valid_url(args.gpx_file_or_url):
+            base_name = args.gpx_file_or_url.split("/")[-1]
+        else:
+            base_name = os.path.splitext(os.path.basename(args.gpx_file_or_url))[0]
+
         args.output = f"{base_name}.csv"
 
-    write_on_csv(args.gpx_file, args.output, args.segment_length)
+    write_on_csv(args.gpx_file_or_url, args.output, args.segment_length)
 
 
 if __name__ == "__main__":

@@ -205,62 +205,65 @@ class Route:
         self.elevation_loss += segment.elevation_loss
 
 
-def get_routes(gpx_file: str, segment_length: float = 1.0) -> list[Route] | None:
+def get_routes(gpx_data_or_file: str, segment_length: float = 1.0) -> list[Route] | None:
     """
     Generate a list of routes from a GPX file, segmenting based on distance
     and calculating route statistics.
 
     Parameters:
-        gpx_file (str): Path to the GPX file to process.
+        gpx_data_or_file (str): Path to the GPX file or XML data to process.
         segment_length (float): Maximum allowed length for a segment (in kilometers).
 
     Returns:
         list[Route] | None: A list of Route objects derived from the GPX file or None if an error occurs.
     """
     try:
-        # Parse GPX file
-        with open(gpx_file, 'r') as f:
-            gpx = gpxpy.parse(f)
-            routes = []
+        try:
+            # Parse GPX file
+            with open(gpx_data_or_file, 'r') as f:
+                gpx = gpxpy.parse(f)
+        except OSError:
+            gpx = gpxpy.parse(gpx_data_or_file)
 
-            # Process tracks
-            for track_idx, track in enumerate(gpx.tracks):
-                route = Route()
-                route.name = track.name
-                route.description = track.description
+        routes = []
+        # Process tracks
+        for track_idx, track in enumerate(gpx.tracks):
+            route = Route()
+            route.name = track.name
+            route.description = track.description
 
-                for segment_idx, segment in enumerate(track.segments):
-                    route_segment = RouteSegment(segment)
+            for segment_idx, segment in enumerate(track.segments):
+                route_segment = RouteSegment(segment)
 
-                    # Variables for point-to-point calculations
-                    previous_point: RoutePoint | None = None
+                # Variables for point-to-point calculations
+                previous_point: RoutePoint | None = None
 
-                    # Process points
-                    for point_idx, point in enumerate(segment.points):
-                        route_point = RoutePoint(point)
+                # Process points
+                for point_idx, point in enumerate(segment.points):
+                    route_point = RoutePoint(point)
 
-                        # Skip points without elevation data
-                        if not route_point.has_elevation() or previous_point is None:
-                            previous_point = route_point
-                            continue
-
-                        route_point.calculate_distance_and_grade(previous_point)
-
-                        route_segment.calculate_elevation_gain_and_loss(route_point, previous_point)
-                        route_segment.add_point(route_point)
-
-                        # Check if we've completed a segment
-                        if route_segment.is_completed(point_idx, segment_length):
-                            route_segment.calculate_points_data()
-
-                            route.add_segment(route_segment)
-                            route_segment = RouteSegment(segment)
-
-                        # Update previous point
+                    # Skip points without elevation data
+                    if not route_point.has_elevation() or previous_point is None:
                         previous_point = route_point
+                        continue
 
-                routes.append(route)
-            return routes
+                    route_point.calculate_distance_and_grade(previous_point)
+
+                    route_segment.calculate_elevation_gain_and_loss(route_point, previous_point)
+                    route_segment.add_point(route_point)
+
+                    # Check if we've completed a segment
+                    if route_segment.is_completed(point_idx, segment_length):
+                        route_segment.calculate_points_data()
+
+                        route.add_segment(route_segment)
+                        route_segment = RouteSegment(segment)
+
+                    # Update previous point
+                    previous_point = route_point
+
+            routes.append(route)
+        return routes
 
     except Exception as e:
         print(f"Error processing GPX file: {e}")
