@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Type
+from typing import Type, TypedDict
 from urllib.parse import urlparse
 
 import requests
@@ -85,8 +85,8 @@ class StravaRouteGPXProvider(RouteGPXProvider):
         return response.content.decode("utf-8")
 
 
-__PROVIDERS = {
-    "www.strava.com": StravaRouteGPXProvider
+__ROUTE_PROVIDERS = {
+    "www.strava.com": StravaRouteGPXProvider,
 }
 
 
@@ -144,10 +144,103 @@ def get_gpx_data(uri: str) -> str | None:
     xml_data = None
     try:
         hostname = get_provider_hostname(uri)
-        provider: Type[RouteGPXProvider] = __PROVIDERS.get(hostname, FileRouteGPXProvider)
+        provider: Type[RouteGPXProvider] = __ROUTE_PROVIDERS.get(hostname, FileRouteGPXProvider)
 
         xml_data = provider.get_route_gpx_data(uri)
     except GPXProviderError as e:
         print(e, file=sys.stderr)
 
     return xml_data
+
+
+class PointElevationError(Exception):
+    pass
+
+
+class Location(TypedDict):
+    position: int
+    latitude: float
+    longitude: float
+
+
+class LocationElevation(TypedDict):
+    latitude: float
+    longitude: float
+    elevation: float
+
+
+class PointElevationProvider:
+    """
+    A base class for retrieving elevation data for a list of geographical locations.
+
+    This class is intended to be extended by specific elevation providers, which
+    will implement the logic for querying their respective APIs or data sources
+    to obtain elevation information for given latitude/longitude coordinates.
+
+    Attributes:
+        api_url (str): The API endpoint URL for the elevation provider. This should
+                       be specified in subclasses.
+    """
+    api_url: None
+
+    @classmethod
+    def get_points_elevations(cls, locations: list[Location]) -> list[LocationElevation]:
+        """
+        Abstract method to retrieve elevations for a list of geographical locations.
+
+        Args:
+            locations (list[Location]): A list of dictionaries containing 'latitude'
+                                        and 'longitude' keys representing the
+                                        geographical locations to query.
+
+        Returns:
+            list[LocationElevation]: A list of dictionaries containing 'latitude',
+                                      'longitude', and 'elevation' keys for the
+                                      queried locations.
+
+        Note:
+            This method must be implemented in subclasses.
+        """
+        pass
+
+
+class OpenElevationProvider(PointElevationProvider):
+    """
+    A class for retrieving elevation data using the Open Elevation API.
+
+    This class extends the `PointElevationProvider` base class and provides
+    functionality for querying the Open Elevation API to obtain elevation
+    data for a list of geographical locations.
+
+    Attributes:
+        api_url (str): The API endpoint URL for the Open Elevation service.
+    """
+    api_url = "https://api.open-elevation.com/api/v1/lookup"
+
+    @classmethod
+    def get_points_elevations(cls, locations: list[Location]) -> list[LocationElevation]:
+        response = requests.post(cls.api_url, json={"locations": locations})
+
+        if not response.ok:
+            raise PointElevationError(f"Open Elevation API: {response.reason}")
+
+        return response.json()["results"]
+
+
+__POINT_ELEVATION_PROVIDERS = [
+    OpenElevationProvider,
+]
+
+
+def get_locations_elevations(locations: list[Location]) -> list[LocationElevation] | None:
+    elevations = []
+    for provider in __POINT_ELEVATION_PROVIDERS:
+        try:
+            elevations = provider.get_points_elevations(sorted(locations, key=lambda lo: lo["position"]))
+
+            if elevations:
+                break
+        except PointElevationError as e:
+            print(e, file=sys.stderr)
+
+    return elevations

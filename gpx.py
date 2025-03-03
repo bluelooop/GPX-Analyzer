@@ -2,6 +2,7 @@ import gpxpy
 import gpxpy.gpx
 from gpxpy.gpx import GPXTrackSegment, GPXTrackPoint
 
+from provider import get_locations_elevations
 from utils import haversine, calculate_gradient
 
 
@@ -209,6 +210,35 @@ class Route:
         self.elevation_loss += segment.elevation_loss
 
 
+def get_points_elevations(points: list[GPXTrackPoint]) -> list[GPXTrackPoint]:
+    """
+    Retrieve elevation data for a list of GPXTrackPoints.
+
+    Parameters:
+        points (list[GPXTrackPoint]): A list of GPXTrackPoint objects without elevation data.
+
+    Returns:
+        list[GPXTrackPoint]: A list of GPXTrackPoint objects with updated elevation data.
+
+    The function performs the following steps:
+        1. Extracts latitude and longitude from each GPXTrackPoint to create a list of locations.
+        2. Calls the `get_locations_elevations` function to fetch elevation data for each location.
+        3. Constructs new GPXTrackPoint objects, adding the elevation values returned from the
+           elevation service.
+    """
+    locations = [{"position": p_idx, "latitude": p.latitude, "longitude": p.longitude} for p_idx, p in
+                 enumerate(points)]
+    locations = get_locations_elevations(locations)
+
+    return [
+        GPXTrackPoint(
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+            elevation=location["elevation"]
+        ) for location in locations
+    ]
+
+
 def get_routes(gpx_data: str, segment_length: float = 1.0) -> list[Route] | None:
     """
     Parse GPX data and generate a list of Route objects, which are segmented based on a given maximum segment length.
@@ -247,7 +277,11 @@ def get_routes(gpx_data: str, segment_length: float = 1.0) -> list[Route] | None
                 previous_point: RoutePoint | None = None
 
                 # Process points
-                for point_idx, point in enumerate(segment.points):
+                points = segment.points
+                if any([p.elevation == 0.0 for p in points]):
+                    points = get_points_elevations(points)
+
+                for point_idx, point in enumerate(points):
                     route_point = RoutePoint(point)
 
                     # Skip points without elevation data
