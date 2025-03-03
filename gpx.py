@@ -5,6 +5,10 @@ from gpxpy.gpx import GPXTrackSegment, GPXTrackPoint
 from utils import haversine, calculate_gradient
 
 
+class GPXError(Exception):
+    pass
+
+
 class RoutePoint(GPXTrackPoint):
     """
     Represents a point on a route, extending a GPX track point by adding
@@ -206,7 +210,26 @@ class Route:
 
 
 def get_routes(gpx_data: str, segment_length: float = 1.0) -> list[Route] | None:
+    """
+    Parse GPX data and generate a list of Route objects, which are segmented based on a given maximum segment length.
 
+    Parameters:
+        gpx_data (str): The GPX data to be processed, provided as a string.
+        segment_length (float): The maximum length (in kilometers) for each segment in the route.
+
+    Returns:
+        list[Route] | None: A list of Route objects representing the parsed GPX data. Returns None if an error occurs.
+
+    Raises:
+        GPXError: If there is an issue with parsing the GPX data or processing the routes.
+
+    The function processes the GPX data as follows:
+        1. Parses the GPX data string using the gpxpy library.
+        2. Creates `Route` objects for each track found in the GPX data.
+        3. Splits tracks into segments (`RouteSegment`) based on the specified maximum length.
+        4. Calculates statistics such as distance, elevation gain/loss, and duration for each segment.
+        5. Adds segments to their respective routes and returns the complete list of routes.
+    """
     try:
         gpx = gpxpy.parse(gpx_data)
 
@@ -251,4 +274,4 @@ def get_routes(gpx_data: str, segment_length: float = 1.0) -> list[Route] | None
         return routes
 
     except Exception as e:
-        print(f"Error processing GPX file: {e}")
+        raise GPXError(f"Error processing GPX file: {e}") from e

@@ -1,21 +1,26 @@
 import argparse
 import csv
 import os
+import sys
 from collections import namedtuple
 
 from dotenv import load_dotenv
 
-from gpx import get_routes
+from gpx import get_routes, GPXError
 from provider import is_valid_url, get_gpx_data
 
 
 def write_on_csv(gpx_data_uri, output_file, segment_length):
     gpx_data = get_gpx_data(gpx_data_uri)
 
-    routes = get_routes(gpx_data, segment_length)
+    try:
+        routes = get_routes(gpx_data, segment_length)
+    except GPXError as e:
+        print(e, file=sys.stderr)
+        return False
 
     if not routes:
-        print(f"No routes found for {gpx_data_uri}")
+        print(f"No routes found for {gpx_data_uri}", file=sys.stderr)
         return False
 
     # Prepare CSV output
@@ -75,7 +80,11 @@ def main():
 
         args.output = f"{base_name}.csv"
 
-    write_on_csv(args.gpx_file_or_url, args.output, args.segment_length)
+    result = write_on_csv(args.gpx_file_or_url, args.output, args.segment_length)
+
+    if not result:
+        print("Failed to process GPX data", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

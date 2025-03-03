@@ -1,7 +1,13 @@
 import os
+import sys
+from typing import Type
 from urllib.parse import urlparse
 
 import requests
+
+
+class GPXProviderError(Exception):
+    pass
 
 
 class RouteGPXProvider:
@@ -40,10 +46,13 @@ class FileRouteGPXProvider(RouteGPXProvider):
 
     @classmethod
     def get_route_gpx_data(cls, gpx_uri: str) -> str:
-        with open(gpx_uri, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        try:
+            with open(gpx_uri, "r", encoding="utf-8") as f:
+                lines = f.readlines()
 
-        return "\n".join(lines)
+            return "\n".join(lines)
+        except OSError as e:
+            raise GPXProviderError(f"File: {e}")
 
 
 class StravaRouteGPXProvider(RouteGPXProvider):
@@ -69,6 +78,9 @@ class StravaRouteGPXProvider(RouteGPXProvider):
     def get_route_gpx_data(cls, gpx_uri: str) -> str:
         route_id = gpx_uri.split("/")[-1]
         response = requests.get(cls.api_url.format(route_id=route_id), headers=cls.__get_request_headers())
+
+        if not response.ok:
+            raise GPXProviderError(f"Strava: {response.json()['message']}")
 
         return response.content.decode("utf-8")
 
@@ -129,12 +141,13 @@ def get_gpx_data(uri: str) -> str | None:
     Returns:
         str | None: The retrieved GPX data as a string, or None if the retrieval fails or the URI is invalid.
     """
+    xml_data = None
     try:
         hostname = get_provider_hostname(uri)
-        provider: RouteGPXProvider = __PROVIDERS[hostname]
+        provider: Type[RouteGPXProvider] = __PROVIDERS.get(hostname, FileRouteGPXProvider)
 
         xml_data = provider.get_route_gpx_data(uri)
-    except KeyError:
-        xml_data = FileRouteGPXProvider.get_route_gpx_data(uri)
+    except GPXProviderError as e:
+        print(e, file=sys.stderr)
 
     return xml_data
