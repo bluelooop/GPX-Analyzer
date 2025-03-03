@@ -9,13 +9,13 @@ from gpx import get_routes
 from provider import is_valid_url, get_gpx_data
 
 
-def write_on_csv(gpx_data_path, output_file, segment_length):
-    gpx_data = get_gpx_data(gpx_data_path)
+def write_on_csv(gpx_data_uri, output_file, segment_length):
+    gpx_data = get_gpx_data(gpx_data_uri)
 
-    routes = get_routes(gpx_data or gpx_data_path, segment_length)
+    routes = get_routes(gpx_data, segment_length)
 
     if not routes:
-        print(f"No routes found for {gpx_data_path}")
+        print(f"No routes found for {gpx_data_uri}")
         return False
 
     # Prepare CSV output
@@ -52,7 +52,7 @@ def write_on_csv(gpx_data_path, output_file, segment_length):
         segment_writer.writerow(columns)
         segment_writer.writerows(rows)
 
-    print(f"Successfully processed {gpx_data_path} to {output_file}")
+    print(f"Successfully processed {gpx_data_uri} to {output_file}")
     return True
 
 

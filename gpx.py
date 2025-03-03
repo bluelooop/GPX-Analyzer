@@ -205,25 +205,10 @@ class Route:
         self.elevation_loss += segment.elevation_loss
 
 
-def get_routes(gpx_data_or_file: str, segment_length: float = 1.0) -> list[Route] | None:
-    """
-    Generate a list of routes from a GPX file, segmenting based on distance
-    and calculating route statistics.
+def get_routes(gpx_data: str, segment_length: float = 1.0) -> list[Route] | None:
 
-    Parameters:
-        gpx_data_or_file (str): Path to the GPX file or XML data to process.
-        segment_length (float): Maximum allowed length for a segment (in kilometers).
-
-    Returns:
-        list[Route] | None: A list of Route objects derived from the GPX file or None if an error occurs.
-    """
     try:
-        try:
-            # Parse GPX file
-            with open(gpx_data_or_file, 'r') as f:
-                gpx = gpxpy.parse(f)
-        except OSError:
-            gpx = gpxpy.parse(gpx_data_or_file)
+        gpx = gpxpy.parse(gpx_data)
 
         routes = []
         # Process tracks

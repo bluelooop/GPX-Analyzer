@@ -5,18 +5,60 @@ import requests
 
 
 class RouteGPXProvider:
+    """
+    A base class for GPX data providers. This class is designed to be extended by specific
+    GPX providers to implement their own logic for retrieving GPX data based on a given URI (gpx_uri).
+    
+    Attributes:
+        api_url: The API URL template or endpoint for the specific provider (to be defined in subclasses).
+    """
     api_url: None
 
     @classmethod
-    def get_route_gpx_data(cls, gpx_url):
+    def get_route_gpx_data(cls, gpx_uri: str) -> str:
+        """
+        A method to be implemented by subclasses to retrieve GPX data from the provider
+        based on the provided URI.
+    
+        Args:
+            gpx_uri (str): The URI containing the route information to fetch the GPX data.
+    
+        Returns:
+            str: The GPX data retrieved from the provider.
+        """
         pass
 
 
+class FileRouteGPXProvider(RouteGPXProvider):
+    """
+    A GPX data provider implementation for local file-based GPX routes.
+
+    This class extends the `RouteGPXProvider` base class and provides functionality
+    for retrieving GPX data from local files. It assumes that the provided URI is a 
+    valid file path on the local file system.
+    """
+
+    @classmethod
+    def get_route_gpx_data(cls, gpx_uri: str) -> str:
+        with open(gpx_uri, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        return "\n".join(lines)
+
+
 class StravaRouteGPXProvider(RouteGPXProvider):
+    """
+        A GPX data provider implementation for Strava routes.
+
+        This class extends the `RouteGPXProvider` base class to provide 
+        functionality for retrieving GPX route data from Strava using its API. 
+        It works by constructing an API request based on a given GPX URI and 
+        fetching the corresponding GPX data.
+    """
     api_url = "https://www.strava.com/api/v3/routes/{route_id}/export_gpx"
 
     @classmethod
-    def __get_request_headers(cls):
+    def __get_request_headers(cls) -> dict:
         access_key = os.getenv("STRAVA_ACCESS_KEY")
 
         return {
@@ -24,8 +66,8 @@ class StravaRouteGPXProvider(RouteGPXProvider):
         }
 
     @classmethod
-    def get_route_gpx_data(cls, gpx_url):
-        route_id = gpx_url.split("/")[-1]
+    def get_route_gpx_data(cls, gpx_uri: str) -> str:
+        route_id = gpx_uri.split("/")[-1]
         response = requests.get(cls.api_url.format(route_id=route_id), headers=cls.__get_request_headers())
 
         return response.content.decode("utf-8")
@@ -36,23 +78,63 @@ __PROVIDERS = {
 }
 
 
-def get_provider_hostname(url):
+def get_provider_hostname(url: str) -> str:
+    """
+    Extracts and returns the hostname (netloc) from a given URL.
+    
+    Args:
+        url (str): The URL from which to extract the hostname.
+    
+    Returns:
+        str: The extracted hostname (netloc) of the given URL.
+    """
     return urlparse(url).netloc
 
 
-def is_valid_url(url):
+def is_valid_url(url: str) -> bool | None:
+    """
+    Validates whether a given string is a properly formatted URL.
+
+    This function checks if the provided URL string contains a valid scheme (e.g., 'http' or 'https'),
+    network location (e.g., 'www.example.com'), and path. If any of these components are missing,
+    the URL is considered invalid.
+
+    Args:
+        url (str): The URL to validate.
+
+    Returns:
+        bool | None: True if the URL is valid, otherwise False.
+    """
     try:
         result = urlparse(url)
+
         return all([result.scheme, result.netloc, result.path])
     except ValueError:
         pass
 
 
-def get_gpx_data(url):
+def get_gpx_data(uri: str) -> str | None:
+    """
+    Retrieves GPX data based on the provided URI by delegating the request to the appropriate GPX provider.
+
+    This function determines the source of the GPX data (e.g., Strava or a local file) by extracting the 
+    hostname from the URI. It then uses a corresponding GPX data provider class to fetch the data. If no 
+    matching provider is found in the predefined list, the function defaults to retrieving the GPX data 
+    from a local file.
+
+    Args:
+        uri (str): The URI specifying the source of the GPX data. It can be a URL for an online provider 
+                   (e.g., Strava) or a local file path.
+
+    Returns:
+        str | None: The retrieved GPX data as a string, or None if the retrieval fails or the URI is invalid.
+    """
     try:
-        hostname = get_provider_hostname(url)
+        hostname = get_provider_hostname(uri)
         provider: RouteGPXProvider = __PROVIDERS[hostname]
 
-        return provider.get_route_gpx_data(url)
+        xml_data = provider.get_route_gpx_data(uri)
     except KeyError:
-        pass
+        xml_data = FileRouteGPXProvider.get_route_gpx_data(uri)
+
+    return xml_data
