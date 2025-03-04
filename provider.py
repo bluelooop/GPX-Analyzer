@@ -6,6 +6,10 @@ from urllib.parse import urlparse
 import requests
 
 
+# region GPX Providers
+# This block includes all providers for handling GPX routes.
+
+
 class GPXProviderError(Exception):
     pass
 
@@ -94,6 +98,11 @@ __ROUTE_PROVIDERS = {
 }
 
 
+def __setting_route_providers():
+    if not os.getenv("STRAVA_ACCESS_KEY"):
+        __ROUTE_PROVIDERS.pop("www.strava.com")
+
+
 def get_provider_hostname(url: str) -> str:
     """
     Extracts and returns the hostname (netloc) from a given URL.
@@ -147,6 +156,8 @@ def get_gpx_data(uri: str) -> str | None:
     """
     xml_data = None
     try:
+        __setting_route_providers()
+
         hostname = get_provider_hostname(uri)
         provider: Type[RouteGPXProvider] = __ROUTE_PROVIDERS.get(hostname, FileRouteGPXProvider)
 
@@ -156,6 +167,11 @@ def get_gpx_data(uri: str) -> str | None:
         print(e, file=sys.stderr)
 
     return xml_data
+
+
+# endregion
+
+# region Point Elevation Providers
 
 
 class PointElevationError(Exception):
@@ -335,7 +351,7 @@ __POINT_ELEVATION_PROVIDERS: list[Type[PointElevationProvider]] = [
 ]
 
 
-def __setting_providers():
+def __setting_point_elevation_providers():
     if os.getenv("GOOGLE_ELEVATION_API_KEY"):
         __POINT_ELEVATION_PROVIDERS.insert(0, GoogleElevationProvider)
 
@@ -371,7 +387,7 @@ def get_locations_elevations(locations: list[Location]) -> list[LocationElevatio
     """
     elevations = []
 
-    __setting_providers()
+    __setting_point_elevation_providers()
 
     for provider in __POINT_ELEVATION_PROVIDERS:  # type: PointElevationProvider
         try:
@@ -385,3 +401,5 @@ def get_locations_elevations(locations: list[Location]) -> list[LocationElevatio
             print(e, file=sys.stderr)
 
     return elevations
+
+# endregion
