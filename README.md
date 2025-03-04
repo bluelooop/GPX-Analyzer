@@ -36,7 +36,8 @@ Happy coding 😊
 Below is an example of how to use the **GPX Analyzer**:
 
 ```bash
-export STRAVA_ACCESS_KEY="STRAVA_ACCESS_KEY to get route using the strava route link"
+export STRAVA_ACCESS_KEY="STRAVA_ACCESS_KEY"  # To get route data using the strava route link
+export GOOGLE_ELEVATION_API_KEY="GOOGLE_ELEVATION_API_KEY" # If you want to use Google Elevation API to get elevations
 python main.py example.gpx -l10
 python main.py https://www.strava.com/routes/3331429303542262604 -l10
 ```

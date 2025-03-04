@@ -16,8 +16,10 @@ class RouteGPXProvider:
     GPX providers to implement their own logic for retrieving GPX data based on a given URI (gpx_uri).
     
     Attributes:
+        name (str): The name of the provider (to be defined in subclasses).
         api_url: The API URL template or endpoint for the specific provider (to be defined in subclasses).
     """
+    name: str
     api_url: None
 
     @classmethod
@@ -43,6 +45,7 @@ class FileRouteGPXProvider(RouteGPXProvider):
     for retrieving GPX data from local files. It assumes that the provided URI is a 
     valid file path on the local file system.
     """
+    name = "Local File"
 
     @classmethod
     def get_route_gpx_data(cls, gpx_uri: str) -> str:
@@ -52,7 +55,7 @@ class FileRouteGPXProvider(RouteGPXProvider):
 
             return "\n".join(lines)
         except OSError as e:
-            raise GPXProviderError(f"File: {e}")
+            raise GPXProviderError(f"{cls.name}: {e}")
 
 
 class StravaRouteGPXProvider(RouteGPXProvider):
@@ -64,6 +67,7 @@ class StravaRouteGPXProvider(RouteGPXProvider):
         It works by constructing an API request based on a given GPX URI and 
         fetching the corresponding GPX data.
     """
+    name = "Strava"
     api_url = "https://www.strava.com/api/v3/routes/{route_id}/export_gpx"
 
     @classmethod
@@ -80,7 +84,7 @@ class StravaRouteGPXProvider(RouteGPXProvider):
         response = requests.get(cls.api_url.format(route_id=route_id), headers=cls.__get_request_headers())
 
         if not response.ok:
-            raise GPXProviderError(f"Strava: {response.json()['message']}")
+            raise GPXProviderError(f"{cls.name}: {response.json()['message']}")
 
         return response.content.decode("utf-8")
 
@@ -146,6 +150,7 @@ def get_gpx_data(uri: str) -> str | None:
         hostname = get_provider_hostname(uri)
         provider: Type[RouteGPXProvider] = __ROUTE_PROVIDERS.get(hostname, FileRouteGPXProvider)
 
+        print(f"Retrieving GPX data using {provider.name}...")
         xml_data = provider.get_route_gpx_data(uri)
     except GPXProviderError as e:
         print(e, file=sys.stderr)
@@ -180,7 +185,9 @@ class PointElevationProvider:
     Attributes:
         api_url (str): The API endpoint URL for the elevation provider. This should
                        be specified in subclasses.
+        name (str): The name of the elevation provider. This should be specified in subclasses.
     """
+    name: str
     api_url: None
 
     @classmethod
@@ -214,7 +221,9 @@ class OpenElevationProvider(PointElevationProvider):
 
     Attributes:
         api_url (str): The API endpoint URL for the Open Elevation service.
+        name (str): The name of the elevation provider.
     """
+    name = "Open Elevation API"
     api_url = "https://api.open-elevation.com/api/v1/lookup"
 
     @classmethod
@@ -222,23 +231,155 @@ class OpenElevationProvider(PointElevationProvider):
         response = requests.post(cls.api_url, json={"locations": locations})
 
         if not response.ok:
-            raise PointElevationError(f"Open Elevation API: {response.reason}")
+            raise PointElevationError(f"{cls.name}: {response.reason}")
 
         return response.json()["results"]
 
 
-__POINT_ELEVATION_PROVIDERS = [
+class GoogleElevationProvider(PointElevationProvider):
+    """
+    A class for retrieving elevation data using the Google Elevation API.
+
+    This class extends the `PointElevationProvider` base class and implements
+    the logic required to query the Google Elevation API. It fetches elevation
+    data for a list of geographical locations (latitude and longitude).
+
+    Attributes:
+        api_url (str): The API endpoint URL for the Google Elevation service.
+        name (str): The name of the elevation provider.
+        max_location_per_request (int): The maximum number of locations that
+                                        can be included in a single request.
+    """
+    name = "Google Elevation API"
+    api_url = "https://maps.googleapis.com/maps/api/elevation/json"
+
+    # Reference: https://developers.google.com/maps/documentation/elevation/requests-elevation#Paths
+    max_location_per_request = 200
+
+    @classmethod
+    def __get_locations_per_requests(cls, locations: list[Location]) -> list[list[Location]]:
+        """
+        Splits a list of locations into smaller batches to adhere to the API's 
+        maximum location limit per request.
+
+        Args:
+            locations (list[Location]): A list of dictionaries containing 'latitude'
+                                        and 'longitude' keys.
+
+        Returns:
+            list[list[Location]]: A list of smaller lists, each containing
+                                  up to 'max_location_per_request' locations.
+        """
+        pages = len(locations) // cls.max_location_per_request + 1
+        locations_per_request = []
+
+        for page in range(pages):
+            locations_per_request.append(
+                locations[page * cls.max_location_per_request: (page + 1) * cls.max_location_per_request]
+            )
+
+        return locations_per_request
+
+    @classmethod
+    def __get_locations_elevations(cls, locations: list[Location]) -> list[LocationElevation]:
+        """
+        Sends a request to the Google Elevation API to fetch elevation data
+        for a given list of locations.
+
+        Args:
+            locations (list[Location]): A list of dictionaries containing 'latitude'
+                                        and 'longitude' keys.
+
+        Returns:
+            list[LocationElevation]: A list of dictionaries containing 'latitude',
+                                      'longitude', and 'elevation' keys.
+
+        Raises:
+            PointElevationError: If the API request fails or returns an error.
+        """
+        locations_data = "|".join([f"{lo['latitude']},{lo['longitude']}" for lo in locations])
+
+        response = requests.get(cls.api_url, params={
+            "locations": locations_data,
+            "key": os.getenv("GOOGLE_ELEVATION_API_KEY")
+        })
+
+        if not response.ok:
+            raise PointElevationError(f"{cls.name}: {response.reason}")
+
+        return [
+            {"latitude": p["location"]["lat"], "longitude": p["location"]["lng"], "elevation": p["elevation"]}
+            for p in response.json()["results"]
+        ]
+
+    @classmethod
+    def get_points_elevations(cls, locations: list[Location]) -> list[LocationElevation]:
+        locations_per_request = cls.__get_locations_per_requests(locations)
+        location_results = []
+        exception = None
+
+        for locations in locations_per_request:
+            try:
+                location_results.extend(cls.__get_locations_elevations(locations))
+            except PointElevationError as e:
+                exception = e
+
+        if exception:
+            raise exception
+
+        return location_results
+
+
+__POINT_ELEVATION_PROVIDERS: list[Type[PointElevationProvider]] = [
     OpenElevationProvider,
 ]
 
 
+def __setting_providers():
+    if os.getenv("GOOGLE_ELEVATION_API_KEY"):
+        __POINT_ELEVATION_PROVIDERS.insert(0, GoogleElevationProvider)
+
+
 def get_locations_elevations(locations: list[Location]) -> list[LocationElevation] | None:
+    """
+    Retrieves elevation data for a list of geographical locations using available elevation providers.
+
+    This function attempts to fetch elevation information for the given locations by iterating through
+    a predefined list of elevation providers. Each provider is queried in turn until a successful
+    response with elevation data is obtained or all providers are exhausted.
+
+    Args:
+        locations (list[Location]): A list of dictionaries, each containing the keys:
+            - 'position' (int): The position or index of the location in the list.
+            - 'latitude' (float): The latitude of the location.
+            - 'longitude' (float): The longitude of the location.
+
+    Returns:
+        list[LocationElevation] | None: A list of dictionaries, each containing the keys:
+            - 'latitude' (float): The latitude of the location.
+            - 'longitude' (float): The longitude of the location.
+            - 'elevation' (float): The retrieved elevation for the location.
+        Returns None if no elevation data is retrieved from any provider.
+
+    Raises:
+        None: Exceptions raised by providers are caught and logged to STDERR.
+
+    Notes:
+        - The locations are sorted by their 'position' key before querying the providers, ensuring
+          that the order of the input list is preserved in the results.
+        - If fetching elevation data fails for all providers, the function returns None.
+    """
     elevations = []
-    for provider in __POINT_ELEVATION_PROVIDERS:
+
+    __setting_providers()
+
+    for provider in __POINT_ELEVATION_PROVIDERS:  # type: PointElevationProvider
         try:
+            print(f"{provider.name}: Trying to get points elevations...")
             elevations = provider.get_points_elevations(sorted(locations, key=lambda lo: lo["position"]))
 
             if elevations:
+                print(f"{provider.name}: Points elevations retrieved successfully!")
                 break
         except PointElevationError as e:
             print(e, file=sys.stderr)
