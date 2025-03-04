@@ -43,7 +43,7 @@ class TestLocationElevationProvider:
 
     def test_get_location_elevations_success(self):
         # Mock input
-        locations = [Location(latitude=10.0, longitude=20.0)]
+        locations = [Location(latitude=10.0, longitude=20.0, position=1)]
 
         # Mock return value for locations with elevations
         mock_elevations = [LocationElevation(latitude=10.0, longitude=20.0, elevation=100.0)]
@@ -60,7 +60,7 @@ class TestLocationElevationProvider:
 
     def test_get_location_elevations_no_elevation_found(self):
         # Mock input
-        locations = [Location(latitude=10.0, longitude=20.0)]
+        locations = [Location(latitude=10.0, longitude=20.0, position=1)]
 
         # Simulate no elevation data found by returning an empty list
         with patch("provider.OpenElevationProvider.get_points_elevations", return_value=[]) as mock_method:
@@ -74,7 +74,7 @@ class TestLocationElevationProvider:
 
     def test_get_location_elevations_exception_handling(self, capfd):
         # Mock input
-        locations = [Location(latitude=10.0, longitude=20.0)]
+        locations = [Location(latitude=10.0, longitude=20.0, position=1)]
 
         # Simulate an exception being raised
         with patch("provider.OpenElevationProvider.get_points_elevations",
@@ -85,7 +85,7 @@ class TestLocationElevationProvider:
             mock_method.assert_called_once_with(locations)
 
             # Assert that the result is None due to the exception
-            assert result is None
+            assert result == []
 
             # Capture stderr output
             captured = capfd.readouterr()
