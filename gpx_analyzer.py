@@ -6,7 +6,7 @@ from collections import namedtuple
 
 from dotenv import load_dotenv
 
-from gpx import get_routes, GPXError
+from gpx import get_routes, GPXError, Route
 from provider import is_valid_url, get_gpx_data
 
 
@@ -61,11 +61,43 @@ def write_on_csv(gpx_data_uri, output_file, segment_length):
     return True
 
 
+def print_on_console(gpx_data_uri, output_format, segment_length):
+    gpx_data = get_gpx_data(gpx_data_uri)
+
+    try:
+        routes = get_routes(gpx_data, segment_length)
+    except GPXError as e:
+        print(e, file=sys.stderr)
+        return False
+
+    if not routes:
+        print(f"No routes found for {gpx_data_uri}", file=sys.stderr)
+        return False
+
+    if output_format == "json":
+        import json
+
+        class RouteEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, Route):
+                    # Return dictionary representation of the Route object
+                    return obj.__dict__
+
+                return super().default(obj)
+
+        print(json.dumps(routes, cls=RouteEncoder, indent=4))
+
+        print(f"Successfully processed {gpx_data_uri}")
+        return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Convert GPX data to CSV with 1km segment analysis and AI descriptions')
     parser.add_argument('gpx_file_or_url', help='Path to GPX data')
-    parser.add_argument('-o', '--output', help='Output CSV file (default: input_file_name.csv)')
+    parser.add_argument('-o', '--output', help='Output file name or stdout to print to console')
+    parser.add_argument('-f', '--format', help='Format to print to console(used if output is stdout)',
+                        default='json', )
     parser.add_argument('-l', '--segment-length', type=float, default=1.0,
                         help='Length of segments in kilometers (default: 1.0)')
 
@@ -80,7 +112,10 @@ def main():
 
         args.output = f"{base_name}.csv"
 
-    result = write_on_csv(args.gpx_file_or_url, args.output, args.segment_length)
+    if args.output == "stdout":
+        result = print_on_console(args.gpx_file_or_url, args.format, args.segment_length)
+    else:
+        result = write_on_csv(args.gpx_file_or_url, args.output, args.segment_length)
 
     if not result:
         print("Failed to process GPX data", file=sys.stderr)

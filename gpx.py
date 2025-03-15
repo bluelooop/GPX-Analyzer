@@ -171,6 +171,24 @@ class RouteSegment:
         self.__calculate_duration()
         self.__calculate_statistics()
 
+    @property
+    def __dict__(self):
+        return {
+            "number": self.number,
+            "start_elevation": self.start_elevation,
+            "end_elevation": self.end_elevation,
+            "min_elevation": self.min_elevation,
+            "max_elevation": self.max_elevation,
+            "distance": self.distance,
+            "start_distance": self.start_distance,
+            "end_distance": self.end_distance,
+            "elevation_gain": self.elevation_gain,
+            "elevation_loss": self.elevation_loss,
+            "avg_grade": self.avg_grade,
+            "max_grade": self.max_grade,
+            "min_grade": self.min_grade,
+        }
+
 
 class Route:
     """
@@ -208,6 +226,17 @@ class Route:
 
         self.elevation_gain += segment.elevation_gain
         self.elevation_loss += segment.elevation_loss
+
+    @property
+    def __dict__(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "distance": self.distance,
+            "elevation_gain": self.elevation_gain,
+            "elevation_loss": self.elevation_loss,
+            "segments": [s.__dict__ for s in self.segments],
+        }
 
 
 def get_points_elevations(points: list[GPXTrackPoint]) -> list[GPXTrackPoint]:
